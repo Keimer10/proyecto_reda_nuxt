@@ -71,10 +71,28 @@
           </v-card>
         </div>
 
-        <!-- Mensaje para otros roles -->
-        <div v-if="currentView === 'dashboard' && userRole !== 'DOCENTE'">
-          <v-card class="pa-4">
-            <v-card-title>Acceso restringido según el rol: {{ userRole }}</v-card-title>
+        <!-- Dashboard para ESTUDIANTE -->
+        <div v-if="currentView === 'dashboard' && userRole === 'ESTUDIANTE'">
+          <v-card class="pa-4 mb-6">
+            <v-card-title>Archivos Subidos por Docentes</v-card-title>
+
+            <v-alert v-if="redaMessage" type="info" class="mb-4">{{ redaMessage }}</v-alert>
+
+            <v-row dense>
+              <v-col cols="12" md="4" v-for="(reda, index) in redaList" :key="index">
+                <v-card class="mb-4">
+                  <v-card-title>{{ reda.nombre }}</v-card-title>
+                  <v-card-subtitle>{{ reda.descripcion }}</v-card-subtitle>
+                  <v-card-text>
+                    <strong>Autor:</strong> {{ reda.id_autor }}<br />
+                    <strong>Formato:</strong> {{ reda.formato }}
+                  </v-card-text>
+                  <v-btn :href="`http://localhost:3002/${reda.ruta}`" target="_blank" color="primary">
+                    Ver Archivo
+                  </v-btn>
+                </v-card>
+              </v-col>
+            </v-row>
           </v-card>
         </div>
 
@@ -87,10 +105,12 @@
 import { ref } from 'vue';
 import axios from 'axios';
 
+const currentView = ref('login');
 const userRole = ref('');
 const registerMessage = ref('');
 const loginMessage = ref('');
-const currentView = ref('login');
+const redaMessage = ref('');
+const redaList = ref([]);
 
 const loginData = ref({
   correo: '',
@@ -118,7 +138,11 @@ const login = async () => {
     const res = await axios.post('http://localhost:3002/auth/login', loginData.value);
     userRole.value = res.data.rol;
     currentView.value = 'dashboard';
-    loginMessage.value = 'Login exitoso. Bienvenido, ' + res.data.nombre_usuario;
+
+    if (userRole.value === 'ESTUDIANTE') {
+      fetchRedas();
+    }
+
   } catch (err) {
     loginMessage.value = err.response?.data.message || 'Error al iniciar sesión';
   }
@@ -129,23 +153,20 @@ const registerUser = async () => {
   try {
     await axios.post('http://localhost:3002/auth/register', registerData.value);
     registerMessage.value = 'Registro exitoso. Ahora puedes iniciar sesión.';
-
-    // ✅ Limpiar formulario y redirigir a login
     registerData.value = { nombre_usuario: '', correo: '', contraseña: '', rol: 'INVITADO' };
+
     setTimeout(() => {
-      registerMessage.value = '';
       currentView.value = 'login';
+      registerMessage.value = '';
     }, 1500);
+
   } catch (err) {
     registerMessage.value = err.response?.data.message || 'Error al registrarse';
   }
 };
 
 const uploadReda = async () => {
-  if (!reda.value.file) {
-    console.log('Selecciona un archivo para subir.');
-    return;
-  }
+  if (!reda.value.file) return;
 
   const formData = new FormData();
   formData.append('file', reda.value.file);
@@ -154,15 +175,22 @@ const uploadReda = async () => {
   formData.append('author', reda.value.author);
 
   try {
-    const res = await axios.post('http://localhost:3002/ovas', formData, {
+    await axios.post('http://localhost:3002/ovas', formData, {
       headers: { 'Content-Type': 'multipart/form-data' }
     });
-    console.log('Archivo subido:', res.data);
-
-    // Limpiar formulario
     reda.value = { title: '', description: '', author: '', file: null };
   } catch (err) {
     console.error('Error al subir el REDA:', err);
+  }
+};
+
+const fetchRedas = async () => {
+  redaMessage.value = '';
+  try {
+    const res = await axios.get('http://localhost:3002/ovas');
+    redaList.value = res.data;
+  } catch (err) {
+    redaMessage.value = 'Error al obtener los REDAs.';
   }
 };
 </script>
