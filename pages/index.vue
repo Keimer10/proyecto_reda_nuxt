@@ -69,6 +69,35 @@
             ></v-file-input>
             <v-btn color="primary" @click="uploadReda">Subir REDA</v-btn>
           </v-card>
+
+          <!-- Mostrar REDAs subidos y opción para editar -->
+          <v-card class="pa-4 mt-6">
+            <v-card-title>Editar REDAs</v-card-title>
+            <v-row dense>
+              <v-col cols="12" md="4" v-for="(reda, index) in redaList" :key="index">
+                <v-card class="mb-4">
+                  <v-card-title>{{ reda.nombre }}</v-card-title>
+                  <v-card-subtitle>{{ reda.descripcion }}</v-card-subtitle>
+                  <v-card-text>
+                    <strong>Autor:</strong> {{ reda.id_autor }}<br />
+                    <strong>Formato:</strong> {{ reda.formato }}
+                  </v-card-text>
+
+                  <!-- Botón para editar REDA -->
+                  <v-btn color="primary" @click="editReda(reda)">Editar</v-btn>
+                </v-card>
+              </v-col>
+            </v-row>
+          </v-card>
+
+          <!-- Formulario para editar el REDA -->
+          <v-card v-if="editingReda" class="pa-4 mb-6">
+            <v-card-title>Actualizar REDA</v-card-title>
+            <v-text-field v-model="editingReda.title" label="Título del archivo" class="mb-3"></v-text-field>
+            <v-textarea v-model="editingReda.description" label="Descripción" class="mb-3"></v-textarea>
+            <v-text-field v-model="editingReda.author" label="Autor" class="mb-3"></v-text-field>
+            <v-btn color="primary" @click="updateReda">Actualizar REDA</v-btn>
+          </v-card>
         </div>
 
         <!-- Dashboard para ESTUDIANTE -->
@@ -80,19 +109,32 @@
 
             <v-row dense>
               <v-col cols="12" md="4" v-for="(reda, index) in redaList" :key="index">
-                <v-card class="mb-4">
+                <v-card class="mb-4 pa-4">
                   <v-card-title>{{ reda.nombre }}</v-card-title>
                   <v-card-subtitle>{{ reda.descripcion }}</v-card-subtitle>
                   <v-card-text>
                     <strong>Autor:</strong> {{ reda.id_autor }}<br />
                     <strong>Formato:</strong> {{ reda.formato }}
                   </v-card-text>
-                  <v-btn :href="`http://localhost:3002/${reda.ruta}`" target="_blank" color="primary">
-                    Ver Archivo
-                  </v-btn>
+
+                  <!-- Mostrar el archivo según el tipo MIME -->
+                  <div v-if="reda.formato && reda.formato.startsWith('image/')">
+                    <img :src="getFileUrl(reda.ruta)" alt="Imagen" style="max-width: 100%; height: auto;" />
+                  </div>
+                  <div v-else-if="reda.formato && reda.formato.startsWith('video/')">
+                    <video :src="getFileUrl(reda.ruta)" controls style="max-width: 100%; height: auto;"></video>
+                  </div>
+                  <div v-else-if="reda.formato === 'application/pdf'">
+                    <iframe :src="getFileUrl(reda.ruta)" style="width: 100%; height: 500px;" frameborder="0"></iframe>
+                  </div>
+                  <div v-else>
+                    <!-- Para otros tipos, mostrar link para descargar o abrir -->
+                    <a :href="getFileUrl(reda.ruta)" target="_blank" download>Descargar archivo</a>
+                  </div>
                 </v-card>
               </v-col>
             </v-row>
+
           </v-card>
         </div>
 
@@ -111,6 +153,7 @@ const registerMessage = ref('');
 const loginMessage = ref('');
 const redaMessage = ref('');
 const redaList = ref([]);
+const editingReda = ref(null); // Nueva referencia para editar el REDA
 
 const loginData = ref({
   correo: '',
@@ -179,6 +222,7 @@ const uploadReda = async () => {
       headers: { 'Content-Type': 'multipart/form-data' }
     });
     reda.value = { title: '', description: '', author: '', file: null };
+    fetchRedas(); // Recargar la lista de REDAs después de subir un nuevo REDA
   } catch (err) {
     console.error('Error al subir el REDA:', err);
   }
@@ -191,6 +235,28 @@ const fetchRedas = async () => {
     redaList.value = res.data;
   } catch (err) {
     redaMessage.value = 'Error al obtener los REDAs.';
+  }
+};
+
+const getFileUrl = (ruta) => {
+  if (!ruta) return '';
+  return ruta.startsWith('http') ? ruta : `http://localhost:3002/uploads/${ruta}`;
+};
+
+const editReda = (redaToEdit) => {
+  // Setea los valores del REDA a editar
+  editingReda.value = { ...redaToEdit };
+};
+
+const updateReda = async () => {
+  if (!editingReda.value) return;
+
+  try {
+    await axios.put(`http://localhost:3002/ovas/${editingReda.value._id}`, editingReda.value);
+    fetchRedas();  // Recargar la lista después de la actualización
+    editingReda.value = null; // Limpiar el formulario de edición
+  } catch (err) {
+    console.error('Error al actualizar el REDA:', err);
   }
 };
 </script>
